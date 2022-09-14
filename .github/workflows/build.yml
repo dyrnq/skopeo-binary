@@ -53,7 +53,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          body: "Release skopeo ${{ steps.get_version.outputs.VERSION }}.  \n source: https://github.com/kubernetes/kubernetes/releases/tag/${{ steps.get_version.outputs.VERSION }}"
+          body: "Release skopeo ${{ steps.get_version.outputs.VERSION }}.  \n source: https://github.com/containers/skopeo/releases/tag/${{ steps.get_version.outputs.VERSION }}"
           files: |
             ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo
             ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo.tar.xz
