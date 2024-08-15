@@ -25,9 +25,10 @@ jobs:
           echo ${{ steps.get_version.outputs.VERSION }}
           echo ${{ github.ref }}
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
-          go-version: '1.20.14'
+          #go-version: '1.20.14'
+          go-version: 'stable'
 
       - name: Get gopath
         id: get_gopath
@@ -39,14 +40,48 @@ jobs:
       - name: Build skopeo binary
         shell: bash
         run: |
+          build_image="golang:1.21-alpine3.20"
           git clone --verbose --progress --depth 1 --branch ${{ steps.get_version.outputs.VERSION }} https://github.com/containers/skopeo.git ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo
 
           pushd ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo &>/dev/null || exit 1
-            make bin/skopeo DISABLE_CGO=1
-            pushd ./bin &>/dev/null
-                tar -cvJf skopeo.tar.xz skopeo
-                tar -cvzf skopeo.tar.gz skopeo
-            popd &>/dev/null
+
+            dist=( darwin/amd64 darwin/arm64 linux/arm64 linux/ppc64le linux/riscv64 linux/amd64 )
+            cp --verbose --force Makefile Makefile.org
+            for ((i=0; i<=${#dist[@]}-1; i++)); do
+              tag="${dist[$i]}"
+              os=$(awk -F/ '{print $1}' <<< "${tag}")
+              arch=$(awk -F/ '{print $2}' <<< "${tag}")
+
+              
+              if grep linux <<< "${os}"; then
+                sed "s@^EXTRA_LDFLAGS.*@EXTRA_LDFLAGS = -extldflags -static @g" Makefile.org > Makefile
+              fi
+
+              sed -i \
+              -e "s|^BUILDTAGS.*|BUILDTAGS = exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp|g" \
+              -e '/^bin\/skopeo:/ { N; s/\(\n\t\)\$(GO)/\1CGO_ENABLE=0 \$(GO)/; }' \
+              ./Makefile
+
+              cat < ./Makefile
+
+              # make bin/skopeo DISABLE_CGO=1 GOOS=${os} GOARCH=${arch}
+              # sed -i "s@dl-cdn.alpinelinux.org@mirrors.ustc.edu.cn@g" /etc/apk/repositories
+
+              docker run --rm -t -v $PWD:/build "${build_image}" sh -c "apk update && apk add bash git gpgme btrfs-progs-dev llvm15-dev gcc musl-dev make && go env | grep CGO_ENABLED && git config --global --add safe.directory '*' && cd /build && echo "${os}-${arch}" && make bin/skopeo GOOS=${os} GOARCH=${arch}"
+              pushd ./bin &>/dev/null
+                  sudo tar -cvJf skopeo-${os}-${arch}.tar.xz skopeo
+                  sudo tar -cvzf skopeo-${os}-${arch}.tar.gz skopeo
+
+                  if [ "${tag}" = "linux/amd64" ]; then
+                    sudo tar -cvJf skopeo.tar.xz skopeo
+                    sudo tar -cvzf skopeo.tar.gz skopeo
+                  fi
+
+                  sudo cp --verbose --force skopeo skopeo-${os}-${arch}
+              popd &>/dev/null
+              ls -l ./bin
+            done
+
             ls -l ./bin
           popd &>/dev/null
 
@@ -59,3 +94,21 @@ jobs:
             ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo
             ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo.tar.xz
             ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo.tar.gz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-darwin-amd64
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-darwin-amd64.tar.xz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-darwin-amd64.tar.gz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-darwin-arm64
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-darwin-arm64.tar.xz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-darwin-arm64.tar.gz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-amd64
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-amd64.tar.xz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-amd64.tar.gz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-arm64
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-arm64.tar.xz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-arm64.tar.gz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-ppc64le
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-ppc64le.tar.xz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-ppc64le.tar.gz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-riscv64
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-riscv64.tar.xz
+            ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo/bin/skopeo-linux-riscv64.tar.gz
