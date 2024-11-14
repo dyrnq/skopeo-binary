@@ -40,7 +40,7 @@ jobs:
       - name: Build skopeo binary
         shell: bash
         run: |
-          build_image="golang:1.21-alpine3.20"
+          build_image="golang:1.23.3-alpine3.20"
           git clone --verbose --progress --depth 1 --branch ${{ steps.get_version.outputs.VERSION }} https://github.com/containers/skopeo.git ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo
 
           pushd ${{ steps.get_gopath.outputs.GOPATH }}/src/github.com/containers/skopeo &>/dev/null || exit 1
